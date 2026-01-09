@@ -1,6 +1,5 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
-import { spawn } from "child_process";
 
 export interface MCPTool {
   name: string;
@@ -44,8 +43,10 @@ export class AzureMCPClient {
       args.push("--read-only");
     }
 
-    // Spawn the MCP server process
-    const mcpProcess = spawn("npx", args, {
+    // Create transport with command and args
+    this.transport = new StdioClientTransport({
+      command: "npx",
+      args: args,
       env: {
         ...process.env,
         AZURE_CLIENT_ID: this.config.clientId,
@@ -53,28 +54,7 @@ export class AzureMCPClient {
         AZURE_TENANT_ID: this.config.tenantId,
         AZURE_SUBSCRIPTION_ID: this.config.subscriptionId,
         NODE_NO_WARNINGS: "1",
-      },
-      stdio: ["pipe", "pipe", "pipe"],
-      shell: process.platform === "win32",
-    });
-
-    mcpProcess.stderr?.on("data", (data) => {
-      console.error(`[MCP stderr]: ${data.toString()}`);
-    });
-
-    mcpProcess.on("error", (error) => {
-      console.error("[MCP process error]:", error);
-    });
-
-    mcpProcess.on("exit", (code) => {
-      console.log(`[MCP process exited with code ${code}]`);
-      this.isConnected = false;
-    });
-
-    // Create transport and client
-    this.transport = new StdioClientTransport({
-      reader: mcpProcess.stdout!,
-      writer: mcpProcess.stdin!,
+      } as Record<string, string>,
     });
 
     this.client = new Client(
